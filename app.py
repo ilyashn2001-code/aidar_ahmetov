@@ -1,54 +1,43 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Dict, List, Tuple
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, send_file
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
 
 app = Flask(__name__)
+app.secret_key = "change-this-to-any-random-string"  # для MVP достаточно, потом заменим
 
 
 # -----------------------------
 # Нормативные пороги (DEMO)
-# Потом заменишь на реальные ГОСТ/РД.
+# Потом заменим на реальный профиль ГОСТ/РД.
 # -----------------------------
 
 @dataclass(frozen=True)
-class Thresholds:
-    # Для параметров "чем меньше, тем лучше" (влага, кислотное, tgδ)
+class ThresholdsMax:
     warn_max: float
     crit_max: float
 
 
 @dataclass(frozen=True)
 class ThresholdsMin:
-    # Для параметров "чем больше, тем лучше" (пробивное напряжение)
     warn_min: float
     crit_min: float
 
 
-@dataclass(frozen=True)
-class ThresholdsMin2:
-    # Для температуры вспышки "чем больше, тем лучше"
-    warn_min: float
-    crit_min: float
-
-
-# Демонстрационные пороги:
-# - Влага: ppm
-# - Пробивное напряжение: kV
-# - Кислотное число: mgKOH/g
-# - tgδ: %
-# - Температура вспышки: °C
 TH = {
-    "moisture_ppm": Thresholds(warn_max=35.0, crit_max=55.0),
-    "acid_mgkoh_g": Thresholds(warn_max=0.10, crit_max=0.20),
-    "tgdelta_pct": Thresholds(warn_max=0.50, crit_max=1.00),
+    "moisture_ppm": ThresholdsMax(warn_max=35.0, crit_max=55.0),
+    "acid_mgkoh_g": ThresholdsMax(warn_max=0.10, crit_max=0.20),
+    "tgdelta_pct": ThresholdsMax(warn_max=0.50, crit_max=1.00),
     "bdv_kv": ThresholdsMin(warn_min=40.0, crit_min=30.0),
-    "flash_c": ThresholdsMin2(warn_min=140.0, crit_min=135.0),
+    "flash_c": ThresholdsMin(warn_min=140.0, crit_min=135.0),
 }
 
-# Вес параметров для индекса риска 0..100
 WEIGHTS = {
     "moisture_ppm": 0.25,
     "bdv_kv": 0.25,
@@ -60,15 +49,7 @@ WEIGHTS = {
 }
 
 
-# -----------------------------
-# Логика оценки
-# -----------------------------
-
-def zone_max(value: float, t: Thresholds) -> Tuple[str, float]:
-    """
-    Чем больше значение, тем хуже.
-    Возвращает (zone, score), где score: 0.0 (норма), 0.5 (предупр.), 1.0 (критично)
-    """
+def zone_max(value: float, t: ThresholdsMax) -> Tuple[str, float]:
     if value <= t.warn_max:
         return "Норма", 0.0
     if value <= t.crit_max:
@@ -77,20 +58,6 @@ def zone_max(value: float, t: Thresholds) -> Tuple[str, float]:
 
 
 def zone_min(value: float, t: ThresholdsMin) -> Tuple[str, float]:
-    """
-    Чем меньше значение, тем хуже (для пробивного).
-    """
-    if value >= t.warn_min:
-        return "Норма", 0.0
-    if value >= t.crit_min:
-        return "Предупреждение", 0.5
-    return "Критично", 1.0
-
-
-def zone_min2(value: float, t: ThresholdsMin2) -> Tuple[str, float]:
-    """
-    Температура вспышки: чем меньше, тем хуже.
-    """
     if value >= t.warn_min:
         return "Норма", 0.0
     if value >= t.crit_min:
@@ -99,7 +66,6 @@ def zone_min2(value: float, t: ThresholdsMin2) -> Tuple[str, float]:
 
 
 def zone_impurities(value: str) -> Tuple[str, float]:
-    # no / trace / yes
     v = (value or "").strip().lower()
     if v == "нет":
         return "Норма", 0.0
@@ -109,7 +75,6 @@ def zone_impurities(value: str) -> Tuple[str, float]:
 
 
 def zone_water_extract(value: str) -> Tuple[str, float]:
-    # neutral / slightly_acidic / acidic
     v = (value or "").strip().lower()
     if v == "нейтральная":
         return "Норма", 0.0
@@ -119,7 +84,6 @@ def zone_water_extract(value: str) -> Tuple[str, float]:
 
 
 def compute_index(scores: Dict[str, float]) -> float:
-    # Взвешенная сумма, нормированная к 0..100
     total = 0.0
     wsum = 0.0
     for k, w in WEIGHTS.items():
@@ -132,7 +96,6 @@ def compute_index(scores: Dict[str, float]) -> float:
 
 
 def overall_status(index: float, any_critical: bool) -> str:
-    # Простая и понятная градация
     if any_critical or index >= 60:
         return "КРИТИЧЕСКОЕ"
     if index >= 25:
@@ -142,8 +105,6 @@ def overall_status(index: float, any_critical: bool) -> str:
 
 def build_recommendations(rows: List[dict]) -> List[str]:
     rec: List[str] = []
-
-    # Правила — простые и объяснимые (потом расширим)
     by_name = {r["name"]: r for r in rows}
 
     moist = by_name["Влагосодержание (ppm)"]["zone"]
@@ -164,7 +125,7 @@ def build_recommendations(rows: List[dict]) -> List[str]:
 
     if acid in {"Предупреждение", "Критично"} or tg in {"Предупреждение", "Критично"} or wext in {"Предупреждение", "Критично"}:
         rec.append("Рассмотреть регенерацию масла или частичную/полную замену при подтверждении устойчивого роста параметров старения.")
-        rec.append("Рекомендуется контроль повторной пробы в ближайшие 2–4 недели (или по регламенту предприятия).")
+        rec.append("Рекомендуется контроль повторной пробы в ближайшие 2-4 недели (или по регламенту предприятия).")
 
     if flash in {"Предупреждение", "Критично"}:
         rec.append("Проверить пожаробезопасные характеристики масла; при снижении ниже нормы рассмотреть замену.")
@@ -175,9 +136,84 @@ def build_recommendations(rows: List[dict]) -> List[str]:
     return rec
 
 
-# -----------------------------
-# Роуты
-# -----------------------------
+def excel_from_result(result: dict) -> BytesIO:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Заключение"
+
+    bold = Font(bold=True)
+    hfill = PatternFill("solid", fgColor="F4E9D3")
+    thin = Side(style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    ws["A1"] = "Заключение по пробе трансформаторного масла"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.merge_cells("A1:D1")
+
+    ws["A3"] = "Трансформатор"
+    ws["B3"] = result.get("transformer_id") or "не указан"
+    ws["A4"] = "Дата пробы"
+    ws["B4"] = result.get("sample_date") or "не указана"
+    ws["A5"] = "Интегральный индекс"
+    ws["B5"] = f'{result.get("index_score", 0)} / 100'
+    ws["A6"] = "Состояние"
+    ws["B6"] = result.get("status") or ""
+
+    for cell in ["A3", "A4", "A5", "A6"]:
+        ws[cell].font = bold
+
+    ws["A8"] = "Показатель"
+    ws["B8"] = "Значение"
+    ws["C8"] = "Оценка"
+    ws["D8"] = "Пояснение"
+    for c in ["A8", "B8", "C8", "D8"]:
+        ws[c].font = bold
+        ws[c].fill = hfill
+        ws[c].border = border
+        ws[c].alignment = Alignment(vertical="center")
+
+    row_i = 9
+    for r in result.get("rows", []):
+        ws[f"A{row_i}"] = r["name"]
+        ws[f"B{row_i}"] = f'{r["value"]} {r["unit"]}'.strip()
+        ws[f"C{row_i}"] = r["zone"]
+        ws[f"D{row_i}"] = r["comment"]
+        for col in ["A", "B", "C", "D"]:
+            ws[f"{col}{row_i}"].border = border
+            ws[f"{col}{row_i}"].alignment = Alignment(wrap_text=True, vertical="top")
+        row_i += 1
+
+    row_i += 1
+    ws[f"A{row_i}"] = "Рекомендации"
+    ws[f"A{row_i}"].font = bold
+    ws.merge_cells(f"A{row_i}:D{row_i}")
+    row_i += 1
+
+    recs = result.get("recommendations", [])
+    for i, rec in enumerate(recs, start=1):
+        ws[f"A{row_i}"] = f"{i}."
+        ws[f"B{row_i}"] = rec
+        ws.merge_cells(f"B{row_i}:D{row_i}")
+        for col in ["A", "B", "C", "D"]:
+            ws[f"{col}{row_i}"].alignment = Alignment(wrap_text=True, vertical="top")
+        row_i += 1
+
+    row_i += 1
+    ws[f"A{row_i}"] = "Принадлежит Казанскому Государственному Энергетическому Университету. Создал Ахметов Айдар Русланович."
+    ws.merge_cells(f"A{row_i}:D{row_i}")
+    ws[f"A{row_i}"].alignment = Alignment(wrap_text=True)
+    ws[f"A{row_i}"].font = Font(size=10)
+
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["C"].width = 16
+    ws.column_dimensions["D"].width = 60
+
+    bio = BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return bio
+
 
 @app.get("/")
 def index():
@@ -186,7 +222,6 @@ def index():
 
 @app.post("/evaluate")
 def evaluate():
-    # Без излишней магии: читаем как float, валидируем
     def f(name: str) -> float:
         raw = (request.form.get(name) or "").replace(",", ".").strip()
         return float(raw)
@@ -251,7 +286,7 @@ def evaluate():
     scores["tgdelta_pct"] = s
     any_critical = any_critical or (z == "Критично")
 
-    z, s = zone_min2(flash, TH["flash_c"])
+    z, s = zone_min(flash, TH["flash_c"])
     rows.append({
         "name": "Температура вспышки (°C)",
         "value": flash,
@@ -288,6 +323,16 @@ def evaluate():
     status = overall_status(index_score, any_critical)
     recs = build_recommendations(rows)
 
+    result = {
+        "transformer_id": transformer_id,
+        "sample_date": sample_date,
+        "status": status,
+        "index_score": index_score,
+        "rows": rows,
+        "recommendations": recs,
+    }
+    session["last_result"] = result  # для Excel-выгрузки
+
     return render_template(
         "result.html",
         transformer_id=transformer_id,
@@ -299,5 +344,17 @@ def evaluate():
     )
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+@app.get("/export/xlsx")
+def export_xlsx():
+    result = session.get("last_result")
+    if not result:
+        return "Нет данных для экспорта. Сначала выполните расчет.", 400
+
+    bio = excel_from_result(result)
+    fname = "zaklyuchenie_transformatornoe_maslo.xlsx"
+    return send_file(
+        bio,
+        as_attachment=True,
+        download_name=fname,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
