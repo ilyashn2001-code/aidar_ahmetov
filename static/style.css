@@ -1,7 +1,6 @@
 :root{
   --bg: #0b1220;
   --panel: rgba(255,255,255,0.06);
-  --panel2: rgba(255,255,255,0.08);
   --stroke: rgba(255,255,255,0.12);
   --text: #e9eefc;
   --muted: rgba(233,238,252,0.65);
@@ -22,7 +21,9 @@
   --btn: #1f6feb;
   --btn2: #2ea043;
 
-  --shadow: 0 10px 30px rgba(0,0,0,0.25);
+  --shadowCard: 0 10px 26px rgba(0,0,0,0.18);
+  --shadowBtn: 0 8px 18px rgba(31,111,235,0.25);
+  --shadowBtnGreen: 0 8px 18px rgba(46,160,67,0.22);
 }
 
 *{ box-sizing: border-box; }
@@ -39,13 +40,9 @@ body{
     radial-gradient(1000px 700px at 90% 20%, rgba(239,68,68,0.12), transparent 60%),
     linear-gradient(180deg, #0b1220 0%, #07101d 100%);
   color: var(--text);
-
-  /* чтобы футер не выглядел странно при маленьком контенте */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-
-  /* корректное оформление системных контролов в тёмной теме */
   color-scheme: dark;
 }
 
@@ -53,8 +50,14 @@ body{
   width: 100%;
   max-width: 1200px;
   margin: 28px auto;
-  padding: 0 18px 26px;
+  padding: 18px 18px 26px;
   flex: 1 0 auto;
+
+  background: rgba(11,18,32,0.72);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .header{
@@ -84,6 +87,7 @@ body{
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
+
 @media (max-width: 980px){
   .grid-2{ grid-template-columns: 1fr; }
 }
@@ -109,6 +113,7 @@ body{
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
 @media (max-width: 720px){
   .form-grid{ grid-template-columns: 1fr; }
 }
@@ -129,8 +134,6 @@ input, select{
   color: var(--text);
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
-
-  /* чтобы не было странных системных обводок/артефактов */
   -webkit-appearance: none;
   appearance: none;
 }
@@ -139,19 +142,16 @@ input::placeholder{
   color: rgba(233,238,252,0.35);
 }
 
-/* аккуратный фокус */
 input:focus, select:focus{
   border-color: rgba(56,189,248,0.55);
   box-shadow: 0 0 0 3px rgba(56,189,248,0.18);
   background: rgba(255,255,255,0.09);
 }
 
-/* датапикер иногда светлый, поэтому принудительно цвет текста */
 input[type="date"]{
   color: var(--text);
 }
 
-/* стрелка у select (без внешних иконок) */
 select{
   background-image:
     linear-gradient(45deg, transparent 50%, rgba(233,238,252,0.75) 50%),
@@ -164,10 +164,9 @@ select{
   padding-right: 34px;
 }
 
-/* ВАЖНО: опции в выпадающем списке делаем читаемыми */
 select option{
-  background: #0b1220;   /* тёмный фон */
-  color: #e9eefc;        /* светлый текст */
+  background: #0b1220;
+  color: #e9eefc;
 }
 
 .actions{
@@ -185,13 +184,18 @@ select option{
   font-weight: 700;
   color: white;
   background: var(--btn);
-  box-shadow: 0 8px 18px rgba(31,111,235,0.25);
+  box-shadow: var(--shadowBtn);
   transition: transform 80ms ease, filter 120ms ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .btn:hover{ filter: brightness(1.05); }
 .btn:active{ transform: translateY(1px); }
 .btn.secondary{ background: rgba(255,255,255,0.14); box-shadow: none; }
-.btn.green{ background: var(--btn2); box-shadow: 0 8px 18px rgba(46,160,67,0.22); }
+.btn.green{ background: var(--btn2); box-shadow: var(--shadowBtnGreen); }
 
 .result-card{
   background: var(--card);
@@ -199,7 +203,25 @@ select option{
   border: 1px solid var(--cardStroke);
   border-radius: 16px;
   padding: 16px;
-  box-shadow: var(--shadow);
+  overflow: hidden;
+  box-shadow: var(--shadowCard);
+  margin-bottom: 18px;
+}
+
+.header-result{
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.result-summary{
+  min-width: 340px;
+}
+
+.result-actions{
+  display:flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 .badge{
@@ -209,7 +231,7 @@ select option{
   padding: 10px 12px;
   border-radius: 14px;
   font-weight: 800;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), var(--shadow);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), var(--shadowCard);
 }
 
 .badge.glow{
@@ -235,12 +257,14 @@ select option{
   border-collapse: collapse;
   margin-top: 10px;
 }
+
 .table th, .table td{
   border-bottom: 1px solid rgba(0,0,0,0.10);
   padding: 10px 10px;
   vertical-align: top;
   font-size: 13px;
 }
+
 .table th{
   text-align:left;
   opacity: 0.8;
@@ -248,71 +272,11 @@ select option{
 }
 
 .footer{
-  margin-top: 18px;
-  color: rgba(233,238,252,0.65);
-  font-size: 12px;
-  text-align: center;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,0.10);
-  flex: 0 0 auto;
-}
-/* Разделение крупных блоков результата */
-.result-card {
-  margin-bottom: 22px;
-}
-
-.header-result{
-  align-items: flex-start;
-  gap: 18px;
-}
-
-.result-summary{
-  min-width: 340px;
-}
-
-.result-actions{
-  display:flex;
-  gap: 12px;
-  margin-top: 14px;
-  flex-wrap: wrap;
-}
-
-.result-card{
-  margin-bottom: 22px;
-}
-
-.result-card{
-  background: var(--card);
-  color: var(--cardText);
-  border: 1px solid var(--cardStroke);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 18px; /* ВАЖНО */
-}
-
-.footer{
   margin-top: 12px;
   color: rgba(233,238,252,0.65);
   font-size: 12px;
   text-align: center;
-  padding-top: 0;
-  border-top: none; /* УБРАТЬ */
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex: 0 0 auto;
 }
-
-.result-card{
-  background: var(--card);
-  color: var(--cardText);
-  border: 1px solid var(--cardStroke);
-  border-radius: 16px;
-  padding: 16px;
-
-  /* это убирает "полосу" на стыках */
-  overflow: hidden;
-
-  /* тень делаем мягче, чтобы не давала цветной кант на градиенте */
-  box-shadow: 0 10px 26px rgba(0,0,0,0.18);
-
-  /* единый отступ между блоками */
-  margin-bottom: 18px;
-}
-
