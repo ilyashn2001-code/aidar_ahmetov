@@ -25,9 +25,9 @@
               <label>Нормативный профиль</label>
               <select name="profile_id" required>
                 <option value="" disabled selected>Выберите профиль</option>
-                <option value="PWR_6_35">Силовой трансформатор 6-35 кВ</option>
-                <option value="PWR_110">Силовой трансформатор 110 кВ</option>
-                <option value="PWR_220_330">Силовой трансформатор 220-330 кВ</option>
+                {% for p in profiles %}
+                  <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
               </select>
             </div>
 
@@ -49,25 +49,25 @@
           <div class="form-grid">
             <div>
               <label>Влагосодержание, ppm</label>
-              <input name="moisture_ppm" required placeholder="Например: 40" />
+              <input name="moisture_ppm" required inputmode="decimal" placeholder="Например: 40" />
             </div>
             <div>
               <label>Пробивное напряжение, кВ</label>
-              <input name="bdv_kv" required placeholder="Например: 25" />
+              <input name="bdv_kv" required inputmode="decimal" placeholder="Например: 25" />
             </div>
 
             <div>
               <label>Кислотное число, мг КОН/г</label>
-              <input name="acid_mgkoh_g" required placeholder="Например: 0.15" />
+              <input name="acid_mgkoh_g" required inputmode="decimal" placeholder="Например: 0.15" />
             </div>
             <div>
               <label>tg δ при 90°C, %</label>
-              <input name="tgdelta_pct" required placeholder="Например: 0.8" />
+              <input name="tgdelta_pct" required inputmode="decimal" placeholder="Например: 0.8" />
             </div>
 
             <div>
               <label>Температура вспышки, °C</label>
-              <input name="flash_c" required placeholder="Например: 136" />
+              <input name="flash_c" required inputmode="decimal" placeholder="Например: 136" />
             </div>
 
             <div>
@@ -97,7 +97,7 @@
     </form>
 
     <div class="footer">
-     Приложение разработано в Казанском Государственном Энергетическом Университете. Автор: Ахметов Айдар Русланович.
+      Приложение разработано в Казанском Государственном Энергетическом Университете. Автор: Ахметов Айдар Русланович.
     </div>
   </div>
 </body>
