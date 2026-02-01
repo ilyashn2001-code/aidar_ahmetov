@@ -8,15 +8,16 @@
 </head>
 <body>
   <div class="container">
-    <div class="header">
+    <div class="header header-result">
       <div>
         <h1 class="h1">Заключение по пробе</h1>
         <div class="sub">Трансформатор: <b>{{ transformer_id or "не указан" }}</b></div>
         <div class="sub">Дата пробы: <b>{{ sample_date or "не указана" }}</b></div>
       </div>
 
-      <div class="result-card">
+      <div class="result-card result-summary">
         <div style="font-weight:800; margin-bottom:6px;">Интегральный индекс состояния</div>
+
         <div style="display:flex; align-items:baseline; gap:10px;">
           <div style="font-size:34px; font-weight:900;">{{ index_score }} / 100</div>
         </div>
@@ -25,13 +26,14 @@
         {% set glow = "" %}
         {% if status == "ПОГРАНИЧНОЕ" %}{% set cls = "warn" %}{% endif %}
         {% if status == "КРИТИЧЕСКОЕ" %}{% set cls = "crit" %}{% set glow = "glow" %}{% endif %}
+
         <div class="badge {{ glow }}" style="margin-top:10px;">
           <span class="pill {{ cls }}">Состояние: {{ status }}</span>
         </div>
 
-        <div class="actions" style="margin-top:12px;">
+        <div class="result-actions">
           <a class="btn green" href="/export/xlsx">Скачать Excel</a>
-          <a class="btn secondary" href="/">Новый расчет</a>
+          <a class="btn" href="/">Новый расчёт</a>
         </div>
       </div>
     </div>
