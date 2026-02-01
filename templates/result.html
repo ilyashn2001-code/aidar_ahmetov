@@ -3,81 +3,78 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Результат оценки — MVP</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 1000px; margin: 24px auto; padding: 0 16px; }
-    .top { display:flex; justify-content:space-between; align-items:flex-start; gap: 16px; flex-wrap: wrap; }
-    .pill { padding: 8px 12px; border-radius: 999px; display:inline-block; font-weight: 700; }
-    .ok { background:#e7f7ee; color:#0b6b2e; }
-    .warn { background:#fff6db; color:#7a5200; }
-    .crit { background:#ffe1e1; color:#8a0f0f; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 16px 0; }
-    table { width:100%; border-collapse: collapse; }
-    th, td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: top; }
-    th { text-align:left; font-size: 14px; color:#444; }
-    .zone { font-weight: 700; }
-    a { color:#111; }
-    ul { margin: 8px 0 0 18px; }
-  </style>
+  <title>Заключение по пробе</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 class="h1">Заключение по пробе</h1>
+        <div class="sub">Трансформатор: <b>{{ transformer_id or "не указан" }}</b></div>
+        <div class="sub">Дата пробы: <b>{{ sample_date or "не указана" }}</b></div>
+      </div>
 
-  <div class="top">
-    <div>
-      <h1>Заключение по пробе</h1>
-      <div>Трансформатор: <b>{{ transformer_id or "не указан" }}</b></div>
-      <div>Дата пробы: <b>{{ sample_date or "не указана" }}</b></div>
+      <div class="result-card">
+        <div style="font-weight:800; margin-bottom:6px;">Интегральный индекс состояния</div>
+        <div style="display:flex; align-items:baseline; gap:10px;">
+          <div style="font-size:34px; font-weight:900;">{{ index_score }} / 100</div>
+        </div>
+
+        {% set cls = "ok" %}
+        {% set glow = "" %}
+        {% if status == "ПОГРАНИЧНОЕ" %}{% set cls = "warn" %}{% endif %}
+        {% if status == "КРИТИЧЕСКОЕ" %}{% set cls = "crit" %}{% set glow = "glow" %}{% endif %}
+        <div class="badge {{ glow }}" style="margin-top:10px;">
+          <span class="pill {{ cls }}">Состояние: {{ status }}</span>
+        </div>
+
+        <div class="actions" style="margin-top:12px;">
+          <a class="btn green" href="/export/xlsx">Скачать Excel</a>
+          <a class="btn secondary" href="/">Новый расчет</a>
+        </div>
+      </div>
     </div>
 
-    <div class="card" style="min-width: 260px;">
-      <div>Интегральный индекс состояния:</div>
-      <div style="font-size: 34px; font-weight: 800;">{{ index_score }} / 100</div>
-      {% set cls = "ok" %}
-      {% if status == "ПОГРАНИЧНОЕ" %}{% set cls = "warn" %}{% endif %}
-      {% if status == "КРИТИЧЕСКОЕ" %}{% set cls = "crit" %}{% endif %}
-      <div class="pill {{ cls }}">Состояние: {{ status }}</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Проверка показателей</h2>
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 28%;">Показатель</th>
-          <th style="width: 14%;">Значение</th>
-          <th style="width: 16%;">Оценка</th>
-          <th>Пояснение</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-          {% set zcls = "ok" %}
-          {% if r.zone == "Предупреждение" %}{% set zcls = "warn" %}{% endif %}
-          {% if r.zone == "Критично" %}{% set zcls = "crit" %}{% endif %}
+    <div class="result-card">
+      <h2 style="margin:0 0 10px 0;">Проверка показателей</h2>
+      <table class="table">
+        <thead>
           <tr>
-            <td>{{ r.name }}</td>
-            <td>{{ r.value }} {{ r.unit }}</td>
-            <td class="zone"><span class="pill {{ zcls }}">{{ r.zone }}</span></td>
-            <td>{{ r.comment }}</td>
+            <th style="width:30%;">Показатель</th>
+            <th style="width:16%;">Значение</th>
+            <th style="width:16%;">Оценка</th>
+            <th>Пояснение</th>
           </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            {% set zcls = "ok" %}
+            {% if r.zone == "Предупреждение" %}{% set zcls = "warn" %}{% endif %}
+            {% if r.zone == "Критично" %}{% set zcls = "crit" %}{% endif %}
+            <tr>
+              <td><b>{{ r.name }}</b></td>
+              <td>{{ r.value }} {{ r.unit }}</td>
+              <td><span class="pill {{ zcls }}">{{ r.zone }}</span></td>
+              <td>{{ r.comment }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="result-card">
+      <h2 style="margin:0 0 10px 0;">Рекомендации</h2>
+      <ul style="margin: 0; padding-left: 18px;">
+        {% for rec in recommendations %}
+          <li style="margin: 6px 0;">{{ rec }}</li>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
+      </ul>
+    </div>
 
-  <div class="card">
-    <h2>Рекомендации</h2>
-    <ul>
-      {% for rec in recommendations %}
-        <li>{{ rec }}</li>
-      {% endfor %}
-    </ul>
+    <div class="footer">
+      Принадлежит Казанскому Государственному Энергетическому Университету. Создал Ахметов Айдар Русланович.
+    </div>
   </div>
-
-  <div style="margin-top: 18px;">
-    <a href="/">← Вернуться к вводу</a>
-  </div>
-
 </body>
 </html>
