@@ -21,22 +21,40 @@
 
   --btn: #1f6feb;
   --btn2: #2ea043;
+
+  --shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 
 *{ box-sizing: border-box; }
+
+html, body{
+  height: 100%;
+}
+
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
-  background: radial-gradient(1200px 600px at 15% 10%, rgba(56,189,248,0.18), transparent 60%),
-              radial-gradient(1000px 700px at 90% 20%, rgba(239,68,68,0.12), transparent 60%),
-              linear-gradient(180deg, #0b1220 0%, #07101d 100%);
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(56,189,248,0.18), transparent 60%),
+    radial-gradient(1000px 700px at 90% 20%, rgba(239,68,68,0.12), transparent 60%),
+    linear-gradient(180deg, #0b1220 0%, #07101d 100%);
   color: var(--text);
+
+  /* чтобы футер не выглядел странно при маленьком контенте */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+
+  /* корректное оформление системных контролов в тёмной теме */
+  color-scheme: dark;
 }
 
 .container{
+  width: 100%;
   max-width: 1200px;
   margin: 28px auto;
   padding: 0 18px 26px;
+  flex: 1 0 auto;
 }
 
 .header{
@@ -75,7 +93,8 @@ body{
   border: 1px solid var(--stroke);
   border-radius: 16px;
   padding: 16px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .panel h2{
@@ -106,12 +125,50 @@ input, select{
   padding: 11px 12px;
   border-radius: 12px;
   border: 1px solid var(--stroke);
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.07);
   color: var(--text);
   outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+
+  /* чтобы не было странных системных обводок/артефактов */
+  -webkit-appearance: none;
+  appearance: none;
 }
-input::placeholder{ color: rgba(233,238,252,0.35); }
-select option{ color:#111; }
+
+input::placeholder{
+  color: rgba(233,238,252,0.35);
+}
+
+/* аккуратный фокус */
+input:focus, select:focus{
+  border-color: rgba(56,189,248,0.55);
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.18);
+  background: rgba(255,255,255,0.09);
+}
+
+/* датапикер иногда светлый, поэтому принудительно цвет текста */
+input[type="date"]{
+  color: var(--text);
+}
+
+/* стрелка у select (без внешних иконок) */
+select{
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(233,238,252,0.75) 50%),
+    linear-gradient(135deg, rgba(233,238,252,0.75) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+/* ВАЖНО: опции в выпадающем списке делаем читаемыми */
+select option{
+  background: #0b1220;   /* тёмный фон */
+  color: #e9eefc;        /* светлый текст */
+}
 
 .actions{
   display:flex;
@@ -128,9 +185,13 @@ select option{ color:#111; }
   font-weight: 700;
   color: white;
   background: var(--btn);
+  box-shadow: 0 8px 18px rgba(31,111,235,0.25);
+  transition: transform 80ms ease, filter 120ms ease;
 }
-.btn.secondary{ background: rgba(255,255,255,0.14); }
-.btn.green{ background: var(--btn2); }
+.btn:hover{ filter: brightness(1.05); }
+.btn:active{ transform: translateY(1px); }
+.btn.secondary{ background: rgba(255,255,255,0.14); box-shadow: none; }
+.btn.green{ background: var(--btn2); box-shadow: 0 8px 18px rgba(46,160,67,0.22); }
 
 .result-card{
   background: var(--card);
@@ -138,6 +199,7 @@ select option{ color:#111; }
   border: 1px solid var(--cardStroke);
   border-radius: 16px;
   padding: 16px;
+  box-shadow: var(--shadow);
 }
 
 .badge{
@@ -147,7 +209,7 @@ select option{ color:#111; }
   padding: 10px 12px;
   border-radius: 14px;
   font-weight: 800;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 10px 30px rgba(0,0,0,0.25);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), var(--shadow);
 }
 
 .badge.glow{
@@ -192,4 +254,5 @@ select option{ color:#111; }
   text-align: center;
   padding-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.10);
+  flex: 0 0 auto;
 }
