@@ -260,3 +260,24 @@ select option{
 .result-card {
   margin-bottom: 22px;
 }
+
+.header-result{
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.result-summary{
+  min-width: 340px;
+}
+
+.result-actions{
+  display:flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.result-card{
+  margin-bottom: 22px;
+}
+
