@@ -8,14 +8,13 @@ from flask import Flask, render_template, request, session, send_file
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-
 app = Flask(__name__)
-app.secret_key = "change-this-to-any-random-string"  # для MVP достаточно, потом заменим
+app.secret_key = "change-this-to-any-random-string"  # для MVP достаточно
 
 
 # -----------------------------
 # Нормативные пороги (DEMO)
-# Потом заменим на реальный профиль ГОСТ/РД.
+# Потом заменим на реальные профили ГОСТ/РД.
 # -----------------------------
 
 @dataclass(frozen=True)
@@ -30,7 +29,8 @@ class ThresholdsMin:
     crit_min: float
 
 
-TH = {
+# Базовый набор порогов (DEMO). Потом сделаем разные для профилей.
+TH_BASE: Dict[str, object] = {
     "moisture_ppm": ThresholdsMax(warn_max=35.0, crit_max=55.0),
     "acid_mgkoh_g": ThresholdsMax(warn_max=0.10, crit_max=0.20),
     "tgdelta_pct": ThresholdsMax(warn_max=0.50, crit_max=1.00),
@@ -38,7 +38,7 @@ TH = {
     "flash_c": ThresholdsMin(warn_min=140.0, crit_min=135.0),
 }
 
-WEIGHTS = {
+WEIGHTS_BASE: Dict[str, float] = {
     "moisture_ppm": 0.25,
     "bdv_kv": 0.25,
     "acid_mgkoh_g": 0.15,
@@ -48,26 +48,29 @@ WEIGHTS = {
     "water_extract": 0.05,
 }
 
+# Профили (пока одинаковые пороги, но логика уже профильная)
 PROFILES = {
-    "PWR_110": {
-        "name": "Силовой трансформатор 110 кВ",
-        "TH": TH,          # пока используем твой TH как базу
-        "WEIGHTS": WEIGHTS # и твои веса
-    },
-
-    # Заглушки, чтобы UI уже работал
     "PWR_6_35": {
         "name": "Силовой трансформатор 6-35 кВ",
-        "TH": TH,
-        "WEIGHTS": WEIGHTS
+        "TH": TH_BASE,
+        "WEIGHTS": WEIGHTS_BASE,
+    },
+    "PWR_110": {
+        "name": "Силовой трансформатор 110 кВ",
+        "TH": TH_BASE,
+        "WEIGHTS": WEIGHTS_BASE,
     },
     "PWR_220_330": {
         "name": "Силовой трансформатор 220-330 кВ",
-        "TH": TH,
-        "WEIGHTS": WEIGHTS
+        "TH": TH_BASE,
+        "WEIGHTS": WEIGHTS_BASE,
     },
 }
 
+
+# -----------------------------
+# Оценка зон
+# -----------------------------
 
 def zone_max(value: float, t: ThresholdsMax) -> Tuple[str, float]:
     if value <= t.warn_max:
@@ -98,7 +101,7 @@ def zone_water_extract(value: str) -> Tuple[str, float]:
     v = (value or "").strip().lower()
     if v == "нейтральная":
         return "Норма", 0.0
-    if v in {"слабокислая", "слабокисл."}:
+    if v in {"слабокислая", "слабокисл.", "слабокислая реакция"}:
         return "Предупреждение", 0.5
     return "Критично", 1.0
 
@@ -113,7 +116,6 @@ def compute_index(scores: Dict[str, float], weights: Dict[str, float]) -> float:
     if wsum == 0:
         return 0.0
     return round((total / wsum) * 100.0, 1)
-
 
 
 def overall_status(index: float, any_critical: bool) -> str:
@@ -157,6 +159,10 @@ def build_recommendations(rows: List[dict]) -> List[str]:
     return rec
 
 
+# -----------------------------
+# Excel
+# -----------------------------
+
 def excel_from_result(result: dict) -> BytesIO:
     wb = Workbook()
     ws = wb.active
@@ -171,29 +177,35 @@ def excel_from_result(result: dict) -> BytesIO:
     ws["A1"].font = Font(bold=True, size=14)
     ws.merge_cells("A1:D1")
 
-    ws["A3"] = "Трансформатор"
-    ws["B3"] = result.get("transformer_id") or "не указан"
-    ws["A4"] = "Дата пробы"
-    ws["B4"] = result.get("sample_date") or "не указана"
-    ws["A5"] = "Интегральный индекс"
-    ws["B5"] = f'{result.get("index_score", 0)} / 100'
-    ws["A6"] = "Состояние"
-    ws["B6"] = result.get("status") or ""
+    ws["A3"] = "Нормативный профиль"
+    ws["B3"] = result.get("profile_name") or "не указан"
 
-    for cell in ["A3", "A4", "A5", "A6"]:
+    ws["A4"] = "Трансформатор (опционально)"
+    ws["B4"] = result.get("transformer_id") or "не указан"
+
+    ws["A5"] = "Дата пробы"
+    ws["B5"] = result.get("sample_date") or "не указана"
+
+    ws["A6"] = "Интегральный индекс"
+    ws["B6"] = f'{result.get("index_score", 0)} / 100'
+
+    ws["A7"] = "Состояние"
+    ws["B7"] = result.get("status") or ""
+
+    for cell in ["A3", "A4", "A5", "A6", "A7"]:
         ws[cell].font = bold
 
-    ws["A8"] = "Показатель"
-    ws["B8"] = "Значение"
-    ws["C8"] = "Оценка"
-    ws["D8"] = "Пояснение"
-    for c in ["A8", "B8", "C8", "D8"]:
+    ws["A9"] = "Показатель"
+    ws["B9"] = "Значение"
+    ws["C9"] = "Оценка"
+    ws["D9"] = "Пояснение"
+    for c in ["A9", "B9", "C9", "D9"]:
         ws[c].font = bold
         ws[c].fill = hfill
         ws[c].border = border
         ws[c].alignment = Alignment(vertical="center")
 
-    row_i = 9
+    row_i = 10
     for r in result.get("rows", []):
         ws[f"A{row_i}"] = r["name"]
         ws[f"B{row_i}"] = f'{r["value"]} {r["unit"]}'.strip()
@@ -226,7 +238,7 @@ def excel_from_result(result: dict) -> BytesIO:
     ws[f"A{row_i}"].font = Font(size=10)
 
     ws.column_dimensions["A"].width = 32
-    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["B"].width = 26
     ws.column_dimensions["C"].width = 16
     ws.column_dimensions["D"].width = 60
 
@@ -236,9 +248,16 @@ def excel_from_result(result: dict) -> BytesIO:
     return bio
 
 
+# -----------------------------
+# Routes
+# -----------------------------
+
 @app.get("/")
 def index():
-    return render_template("index.html")
+    # Передаем профили в UI для выпадающего списка
+    profiles_for_ui = [{"id": k, "name": v["name"]} for k, v in PROFILES.items()]
+    profiles_for_ui.sort(key=lambda x: x["name"])
+    return render_template("index.html", profiles=profiles_for_ui)
 
 
 @app.post("/evaluate")
@@ -247,16 +266,18 @@ def evaluate():
         raw = (request.form.get(name) or "").replace(",", ".").strip()
         return float(raw)
 
+    # 1) Профиль (влияет на расчёт)
+    profile_id = (request.form.get("profile_id") or "").strip()
+    profile = PROFILES.get(profile_id) or PROFILES["PWR_110"]  # дефолт 110 кВ
+    th = profile["TH"]
+    weights = profile["WEIGHTS"]
+    profile_name = profile["name"]
+
+    # 2) Инфо поля (не влияют на расчёт)
     transformer_id = (request.form.get("transformer_id") or "").strip()
     sample_date = (request.form.get("sample_date") or "").strip()
 
-profile_id = (request.form.get("profile_id") or "").strip()
-profile = PROFILES.get(profile_id) or PROFILES["PWR_110"]  # дефолт на 110 кВ
-th = profile["TH"]
-weights = profile["WEIGHTS"]
-profile_name = profile["name"]
-
-    
+    # 3) Показатели масла
     moisture_ppm = f("moisture_ppm")
     bdv_kv = f("bdv_kv")
     acid = f("acid_mgkoh_g")
@@ -281,7 +302,7 @@ profile_name = profile["name"]
     scores["moisture_ppm"] = s
     any_critical = any_critical or (z == "Критично")
 
-    z, s = zone_min(bdv_kv, TH["bdv_kv"])
+    z, s = zone_min(bdv_kv, th["bdv_kv"])
     rows.append({
         "name": "Пробивное напряжение (кВ)",
         "value": bdv_kv,
@@ -292,7 +313,7 @@ profile_name = profile["name"]
     scores["bdv_kv"] = s
     any_critical = any_critical or (z == "Критично")
 
-    z, s = zone_max(acid, TH["acid_mgkoh_g"])
+    z, s = zone_max(acid, th["acid_mgkoh_g"])
     rows.append({
         "name": "Кислотное число (мг КОН/г)",
         "value": acid,
@@ -303,7 +324,7 @@ profile_name = profile["name"]
     scores["acid_mgkoh_g"] = s
     any_critical = any_critical or (z == "Критично")
 
-    z, s = zone_max(tg, TH["tgdelta_pct"])
+    z, s = zone_max(tg, th["tgdelta_pct"])
     rows.append({
         "name": "tg δ при 90°C (%)",
         "value": tg,
@@ -314,7 +335,7 @@ profile_name = profile["name"]
     scores["tgdelta_pct"] = s
     any_critical = any_critical or (z == "Критично")
 
-    z, s = zone_min(flash, TH["flash_c"])
+    z, s = zone_min(flash, th["flash_c"])
     rows.append({
         "name": "Температура вспышки (°C)",
         "value": flash,
@@ -352,20 +373,20 @@ profile_name = profile["name"]
     recs = build_recommendations(rows)
 
     result = {
+        "profile_id": profile_id,
+        "profile_name": profile_name,
         "transformer_id": transformer_id,
         "sample_date": sample_date,
         "status": status,
         "index_score": index_score,
         "rows": rows,
         "recommendations": recs,
-        "profile_id": profile_id,
-"profile_name": profile_name,
-
     }
     session["last_result"] = result  # для Excel-выгрузки
 
     return render_template(
         "result.html",
+        profile_name=profile_name,
         transformer_id=transformer_id,
         sample_date=sample_date,
         status=status,
@@ -389,3 +410,7 @@ def export_xlsx():
         download_name=fname,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
