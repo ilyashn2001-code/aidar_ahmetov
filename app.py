@@ -103,16 +103,17 @@ def zone_water_extract(value: str) -> Tuple[str, float]:
     return "Критично", 1.0
 
 
-def compute_index(scores: Dict[str, float]) -> float:
+def compute_index(scores: Dict[str, float], weights: Dict[str, float]) -> float:
     total = 0.0
     wsum = 0.0
-    for k, w in WEIGHTS.items():
+    for k, w in weights.items():
         if k in scores:
             total += scores[k] * w
             wsum += w
     if wsum == 0:
         return 0.0
     return round((total / wsum) * 100.0, 1)
+
 
 
 def overall_status(index: float, any_critical: bool) -> str:
@@ -249,6 +250,13 @@ def evaluate():
     transformer_id = (request.form.get("transformer_id") or "").strip()
     sample_date = (request.form.get("sample_date") or "").strip()
 
+profile_id = (request.form.get("profile_id") or "").strip()
+profile = PROFILES.get(profile_id) or PROFILES["PWR_110"]  # дефолт на 110 кВ
+th = profile["TH"]
+weights = profile["WEIGHTS"]
+profile_name = profile["name"]
+
+    
     moisture_ppm = f("moisture_ppm")
     bdv_kv = f("bdv_kv")
     acid = f("acid_mgkoh_g")
@@ -262,7 +270,7 @@ def evaluate():
     scores: Dict[str, float] = {}
     any_critical = False
 
-    z, s = zone_max(moisture_ppm, TH["moisture_ppm"])
+    z, s = zone_max(moisture_ppm, th["moisture_ppm"])
     rows.append({
         "name": "Влагосодержание (ppm)",
         "value": moisture_ppm,
@@ -339,7 +347,7 @@ def evaluate():
     scores["water_extract"] = s
     any_critical = any_critical or (z == "Критично")
 
-    index_score = compute_index(scores)
+    index_score = compute_index(scores, weights)
     status = overall_status(index_score, any_critical)
     recs = build_recommendations(rows)
 
@@ -350,6 +358,9 @@ def evaluate():
         "index_score": index_score,
         "rows": rows,
         "recommendations": recs,
+        "profile_id": profile_id,
+"profile_name": profile_name,
+
     }
     session["last_result"] = result  # для Excel-выгрузки
 
