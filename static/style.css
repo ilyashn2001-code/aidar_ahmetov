@@ -281,3 +281,26 @@ select option{
   margin-bottom: 22px;
 }
 
+.result-card{
+  background: var(--card);
+  color: var(--cardText);
+  border: 1px solid var(--cardStroke);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 18px; /* ВАЖНО */
+}
+
+.footer{
+  margin-top: 12px;
+  color: rgba(233,238,252,0.65);
+  font-size: 12px;
+  text-align: center;
+  padding-top: 0;
+  border-top: none; /* УБРАТЬ */
+}
+
+
+.result-card + .result-card{
+  margin-top: 18px;
+}
+
