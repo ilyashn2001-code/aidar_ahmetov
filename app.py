@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from flask import Flask, render_template, request, session, send_file
 from openpyxl import Workbook
@@ -13,8 +13,9 @@ app.secret_key = "change-this-to-any-random-string"  # для MVP достато
 
 
 # -----------------------------
-# Нормативные пороги (DEMO)
-# Потом заменим на реальные профили ГОСТ/РД.
+# Нормативные пороги (MVP)
+# Принцип: чем выше класс напряжения, тем строже нормы.
+# Источник-идеология: IEC 60422 + практика эксплуатации (упрощенная модель для MVP).
 # -----------------------------
 
 @dataclass(frozen=True)
@@ -29,15 +30,41 @@ class ThresholdsMin:
     crit_min: float
 
 
-# Базовый набор порогов (DEMO). Потом сделаем разные для профилей.
-TH_BASE: Dict[str, object] = {
-    "moisture_ppm": ThresholdsMax(warn_max=35.0, crit_max=55.0),
-    "acid_mgkoh_g": ThresholdsMax(warn_max=0.10, crit_max=0.20),
-    "tgdelta_pct": ThresholdsMax(warn_max=0.50, crit_max=1.00),
-    "bdv_kv": ThresholdsMin(warn_min=40.0, crit_min=30.0),
+# -----------------------------
+# Профили
+# -----------------------------
+# Важно: для каждого профиля свой набор TH и (при желании) свои WEIGHTS.
+
+TH_6_35: Dict[str, object] = {
+    # Чем ниже, тем хуже (min)
+    "bdv_kv": ThresholdsMin(warn_min=30.0, crit_min=25.0),
     "flash_c": ThresholdsMin(warn_min=140.0, crit_min=135.0),
+
+    # Чем выше, тем хуже (max)
+    "moisture_ppm": ThresholdsMax(warn_max=20.0, crit_max=30.0),
+    "acid_mgkoh_g": ThresholdsMax(warn_max=0.10, crit_max=0.20),
+    "tgdelta_pct": ThresholdsMax(warn_max=1.5, crit_max=2.5),
 }
 
+TH_110: Dict[str, object] = {
+    "bdv_kv": ThresholdsMin(warn_min=40.0, crit_min=35.0),
+    "flash_c": ThresholdsMin(warn_min=140.0, crit_min=135.0),
+
+    "moisture_ppm": ThresholdsMax(warn_max=15.0, crit_max=25.0),
+    "acid_mgkoh_g": ThresholdsMax(warn_max=0.08, crit_max=0.15),
+    "tgdelta_pct": ThresholdsMax(warn_max=1.0, crit_max=2.0),
+}
+
+TH_220_330: Dict[str, object] = {
+    "bdv_kv": ThresholdsMin(warn_min=50.0, crit_min=45.0),
+    "flash_c": ThresholdsMin(warn_min=140.0, crit_min=135.0),
+
+    "moisture_ppm": ThresholdsMax(warn_max=10.0, crit_max=20.0),
+    "acid_mgkoh_g": ThresholdsMax(warn_max=0.05, crit_max=0.10),
+    "tgdelta_pct": ThresholdsMax(warn_max=0.8, crit_max=1.5),
+}
+
+# Веса можно оставить общими, но теперь профили уже различаются порогами.
 WEIGHTS_BASE: Dict[str, float] = {
     "moisture_ppm": 0.25,
     "bdv_kv": 0.25,
@@ -48,21 +75,23 @@ WEIGHTS_BASE: Dict[str, float] = {
     "water_extract": 0.05,
 }
 
-# Профили (пока одинаковые пороги, но логика уже профильная)
 PROFILES = {
     "PWR_6_35": {
         "name": "Силовой трансформатор 6-35 кВ",
-        "TH": TH_BASE,
+        "source": "IEC 60422 (упрощенная модель для MVP), отраслевые практики",
+        "TH": TH_6_35,
         "WEIGHTS": WEIGHTS_BASE,
     },
     "PWR_110": {
         "name": "Силовой трансформатор 110 кВ",
-        "TH": TH_BASE,
+        "source": "IEC 60422 (упрощенная модель для MVP), отраслевые практики",
+        "TH": TH_110,
         "WEIGHTS": WEIGHTS_BASE,
     },
     "PWR_220_330": {
         "name": "Силовой трансформатор 220-330 кВ",
-        "TH": TH_BASE,
+        "source": "IEC 60422 (упрощенная модель для MVP), отраслевые практики",
+        "TH": TH_220_330,
         "WEIGHTS": WEIGHTS_BASE,
     },
 }
@@ -119,6 +148,7 @@ def compute_index(scores: Dict[str, float], weights: Dict[str, float]) -> float:
 
 
 def overall_status(index: float, any_critical: bool) -> str:
+    # MVP правило: критично если есть хотя бы один критичный показатель или высокий индекс
     if any_critical or index >= 60:
         return "КРИТИЧЕСКОЕ"
     if index >= 25:
@@ -180,32 +210,35 @@ def excel_from_result(result: dict) -> BytesIO:
     ws["A3"] = "Нормативный профиль"
     ws["B3"] = result.get("profile_name") or "не указан"
 
-    ws["A4"] = "Трансформатор (опционально)"
-    ws["B4"] = result.get("transformer_id") or "не указан"
+    ws["A4"] = "Источник норм (справочно)"
+    ws["B4"] = result.get("profile_source") or "не указан"
 
-    ws["A5"] = "Дата пробы"
-    ws["B5"] = result.get("sample_date") or "не указана"
+    ws["A5"] = "Трансформатор (опционально)"
+    ws["B5"] = result.get("transformer_id") or "не указан"
 
-    ws["A6"] = "Интегральный индекс"
-    ws["B6"] = f'{result.get("index_score", 0)} / 100'
+    ws["A6"] = "Дата пробы"
+    ws["B6"] = result.get("sample_date") or "не указана"
 
-    ws["A7"] = "Состояние"
-    ws["B7"] = result.get("status") or ""
+    ws["A7"] = "Интегральный индекс"
+    ws["B7"] = f'{result.get("index_score", 0)} / 100'
 
-    for cell in ["A3", "A4", "A5", "A6", "A7"]:
+    ws["A8"] = "Состояние"
+    ws["B8"] = result.get("status") or ""
+
+    for cell in ["A3", "A4", "A5", "A6", "A7", "A8"]:
         ws[cell].font = bold
 
-    ws["A9"] = "Показатель"
-    ws["B9"] = "Значение"
-    ws["C9"] = "Оценка"
-    ws["D9"] = "Пояснение"
-    for c in ["A9", "B9", "C9", "D9"]:
+    ws["A10"] = "Показатель"
+    ws["B10"] = "Значение"
+    ws["C10"] = "Оценка"
+    ws["D10"] = "Пояснение"
+    for c in ["A10", "B10", "C10", "D10"]:
         ws[c].font = bold
         ws[c].fill = hfill
         ws[c].border = border
         ws[c].alignment = Alignment(vertical="center")
 
-    row_i = 10
+    row_i = 11
     for r in result.get("rows", []):
         ws[f"A{row_i}"] = r["name"]
         ws[f"B{row_i}"] = f'{r["value"]} {r["unit"]}'.strip()
@@ -238,7 +271,7 @@ def excel_from_result(result: dict) -> BytesIO:
     ws[f"A{row_i}"].font = Font(size=10)
 
     ws.column_dimensions["A"].width = 32
-    ws.column_dimensions["B"].width = 26
+    ws.column_dimensions["B"].width = 40
     ws.column_dimensions["C"].width = 16
     ws.column_dimensions["D"].width = 60
 
@@ -249,12 +282,25 @@ def excel_from_result(result: dict) -> BytesIO:
 
 
 # -----------------------------
+# Helpers
+# -----------------------------
+
+def parse_float_field(field_name: str) -> float:
+    raw = (request.form.get(field_name) or "").replace(",", ".").strip()
+    if raw == "":
+        raise ValueError(f"Поле '{field_name}' пустое.")
+    try:
+        return float(raw)
+    except ValueError as e:
+        raise ValueError(f"Поле '{field_name}' должно быть числом. Получено: '{raw}'") from e
+
+
+# -----------------------------
 # Routes
 # -----------------------------
 
 @app.get("/")
 def index():
-    # Передаем профили в UI для выпадающего списка
     profiles_for_ui = [{"id": k, "name": v["name"]} for k, v in PROFILES.items()]
     profiles_for_ui.sort(key=lambda x: x["name"])
     return render_template("index.html", profiles=profiles_for_ui)
@@ -262,27 +308,28 @@ def index():
 
 @app.post("/evaluate")
 def evaluate():
-    def f(name: str) -> float:
-        raw = (request.form.get(name) or "").replace(",", ".").strip()
-        return float(raw)
-
     # 1) Профиль (влияет на расчёт)
     profile_id = (request.form.get("profile_id") or "").strip()
     profile = PROFILES.get(profile_id) or PROFILES["PWR_110"]  # дефолт 110 кВ
+
     th = profile["TH"]
     weights = profile["WEIGHTS"]
     profile_name = profile["name"]
+    profile_source = profile.get("source", "")
 
     # 2) Инфо поля (не влияют на расчёт)
     transformer_id = (request.form.get("transformer_id") or "").strip()
     sample_date = (request.form.get("sample_date") or "").strip()
 
     # 3) Показатели масла
-    moisture_ppm = f("moisture_ppm")
-    bdv_kv = f("bdv_kv")
-    acid = f("acid_mgkoh_g")
-    tg = f("tgdelta_pct")
-    flash = f("flash_c")
+    try:
+        moisture_ppm = parse_float_field("moisture_ppm")
+        bdv_kv = parse_float_field("bdv_kv")
+        acid = parse_float_field("acid_mgkoh_g")
+        tg = parse_float_field("tgdelta_pct")
+        flash = parse_float_field("flash_c")
+    except ValueError as err:
+        return str(err), 400
 
     impurities = (request.form.get("impurities") or "нет").strip()
     water_extract = (request.form.get("water_extract") or "нейтральная").strip()
@@ -373,8 +420,9 @@ def evaluate():
     recs = build_recommendations(rows)
 
     result = {
-        "profile_id": profile_id,
+        "profile_id": profile_id or "PWR_110",
         "profile_name": profile_name,
+        "profile_source": profile_source,
         "transformer_id": transformer_id,
         "sample_date": sample_date,
         "status": status,
@@ -382,7 +430,7 @@ def evaluate():
         "rows": rows,
         "recommendations": recs,
     }
-    session["last_result"] = result  # для Excel-выгрузки
+    session["last_result"] = result
 
     return render_template(
         "result.html",
