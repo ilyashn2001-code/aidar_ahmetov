@@ -48,6 +48,26 @@ WEIGHTS = {
     "water_extract": 0.05,
 }
 
+PROFILES = {
+    "PWR_110": {
+        "name": "Силовой трансформатор 110 кВ",
+        "TH": TH,          # пока используем твой TH как базу
+        "WEIGHTS": WEIGHTS # и твои веса
+    },
+
+    # Заглушки, чтобы UI уже работал
+    "PWR_6_35": {
+        "name": "Силовой трансформатор 6-35 кВ",
+        "TH": TH,
+        "WEIGHTS": WEIGHTS
+    },
+    "PWR_220_330": {
+        "name": "Силовой трансформатор 220-330 кВ",
+        "TH": TH,
+        "WEIGHTS": WEIGHTS
+    },
+}
+
 
 def zone_max(value: float, t: ThresholdsMax) -> Tuple[str, float]:
     if value <= t.warn_max:
