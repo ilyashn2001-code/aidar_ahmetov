@@ -358,3 +358,23 @@ def export_xlsx():
         download_name=fname,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+    from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/evaluate", methods=["POST"])
+def evaluate():
+    # пока заглушка
+    return render_template(
+        "result.html",
+        score=65,
+        status="КРИТИЧЕСКОЕ"
+    )
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
