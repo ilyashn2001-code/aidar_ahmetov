@@ -256,3 +256,7 @@ select option{
   border-top: 1px solid rgba(255,255,255,0.10);
   flex: 0 0 auto;
 }
+/* Разделение крупных блоков результата */
+.result-card {
+  margin-bottom: 22px;
+}
