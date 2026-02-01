@@ -299,8 +299,20 @@ select option{
   border-top: none; /* УБРАТЬ */
 }
 
+.result-card{
+  background: var(--card);
+  color: var(--cardText);
+  border: 1px solid var(--cardStroke);
+  border-radius: 16px;
+  padding: 16px;
 
-.result-card + .result-card{
-  margin-top: 18px;
+  /* это убирает "полосу" на стыках */
+  overflow: hidden;
+
+  /* тень делаем мягче, чтобы не давала цветной кант на градиенте */
+  box-shadow: 0 10px 26px rgba(0,0,0,0.18);
+
+  /* единый отступ между блоками */
+  margin-bottom: 18px;
 }
 
