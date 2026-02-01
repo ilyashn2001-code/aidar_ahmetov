@@ -20,14 +20,27 @@
         <div class="panel">
           <h2>Данные объекта</h2>
           <div class="form-grid">
+
             <div>
-              <label>Идентификатор трансформатора</label>
-              <input name="transformer_id" placeholder="Например: Т-1 110/10 25 МВА" />
+              <label>Нормативный профиль</label>
+              <select name="profile_id" required>
+                <option value="" disabled selected>Выберите профиль</option>
+                <option value="PWR_6_35">Силовой трансформатор 6-35 кВ</option>
+                <option value="PWR_110">Силовой трансформатор 110 кВ</option>
+                <option value="PWR_220_330">Силовой трансформатор 220-330 кВ</option>
+              </select>
             </div>
+
             <div>
               <label>Дата отбора пробы</label>
               <input name="sample_date" type="date" />
             </div>
+
+            <div style="grid-column: 1 / -1;">
+              <label>Идентификатор/марка трансформатора (опционально)</label>
+              <input name="transformer_id" placeholder="Например: Т-1 110/10 25 МВА" />
+            </div>
+
           </div>
         </div>
 
@@ -56,6 +69,7 @@
               <label>Температура вспышки, °C</label>
               <input name="flash_c" required placeholder="Например: 136" />
             </div>
+
             <div>
               <label>Механические примеси</label>
               <select name="impurities">
@@ -81,15 +95,6 @@
         </div>
       </div>
     </form>
-
-    
-<label>Нормативный профиль</label>
-<select name="profile_id" required>
-  <option value="" disabled selected>Выберите профиль</option>
-  <option value="PWR_6_35">Силовой трансформатор 6-35 кВ</option>
-  <option value="PWR_110">Силовой трансформатор 110 кВ</option>
-  <option value="PWR_220_330">Силовой трансформатор 220-330 кВ</option>
-</select>
 
     <div class="footer">
       Принадлежит Казанскому Государственному Энергетическому Университету. Создал Ахметов Айдар Русланович.
