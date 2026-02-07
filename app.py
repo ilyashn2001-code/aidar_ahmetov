@@ -9,7 +9,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 app = Flask(__name__)
-app.secret_key = "change-this-to-any-random-string"  # для MVP достаточно
+import os
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 
 # -----------------------------
